@@ -7,6 +7,9 @@ and NIST 800-53 SC-28(1).
 The idea is to collect the evidence once and grade it against each framework,
 instead of running a separate check per framework.
 
+**Visual overview:** https://dev-kfarmer.github.io/grc-s3-encryption-crosswalk/overview.html
+— the pipeline, the pass/fail matrix, and the exception register on one page.
+
 ## Why the frameworks disagree
 
 The three don't set the same bar:

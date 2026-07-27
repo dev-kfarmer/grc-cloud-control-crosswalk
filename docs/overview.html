@@ -1,0 +1,772 @@
+<title>UC-04 Evidence Pipeline — S3 Encryption at Rest</title>
+<style>
+  :root {
+    --bg: #F2F4F8;
+    --surface: #FFFFFF;
+    --surface-sunken: #E9ECF3;
+    --ink: #1B2333;
+    --ink-muted: #57627A;
+    --ink-faint: #8792A8;
+    --border: #DBE0EA;
+    --accent: #4453C4;
+    --accent-soft: #EAECFA;
+    --pass: #1F8A5F;
+    --pass-soft: #E4F5EC;
+    --fail: #C1433F;
+    --fail-soft: #FBEBEA;
+    --waived: #A6740E;
+    --waived-soft: #FBF2DC;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #10141C;
+    --surface: #171C27;
+    --surface-sunken: #1E2431;
+    --ink: #E7EBF3;
+    --ink-muted: #9AA4BA;
+    --ink-faint: #6B7690;
+    --border: #2A3140;
+    --accent: #8B96F2;
+    --accent-soft: #232A47;
+    --pass: #49C08C;
+    --pass-soft: #163127;
+    --fail: #E58884;
+    --fail-soft: #35201F;
+    --waived: #E3B75B;
+    --waived-soft: #362B14;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141C;
+      --surface: #171C27;
+      --surface-sunken: #1E2431;
+      --ink: #E7EBF3;
+      --ink-muted: #9AA4BA;
+      --ink-faint: #6B7690;
+      --border: #2A3140;
+      --accent: #8B96F2;
+      --accent-soft: #232A47;
+      --pass: #49C08C;
+      --pass-soft: #163127;
+      --fail: #E58884;
+      --fail-soft: #35201F;
+      --waived: #E3B75B;
+      --waived-soft: #362B14;
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 4.5rem 1.75rem 6rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.9rem;
+  }
+
+  h1 {
+    font-size: clamp(1.9rem, 1.4rem + 2vw, 2.7rem);
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.9rem;
+    text-wrap: balance;
+    font-weight: 650;
+  }
+
+  .lede {
+    font-size: 1.1rem;
+    color: var(--ink-muted);
+    max-width: 62ch;
+    margin: 0 0 3rem;
+  }
+
+  section { margin-bottom: 3.25rem; }
+
+  h2 {
+    font-size: 1.05rem;
+    font-weight: 650;
+    margin: 0 0 1.25rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+  }
+
+  h2 .step {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink-faint);
+    font-weight: 500;
+  }
+
+  p { color: var(--ink-muted); }
+
+  /* --- Identity cards --- */
+  .identity-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 3.25rem;
+  }
+
+  @media (max-width: 620px) {
+    .identity-row { grid-template-columns: 1fr; }
+  }
+
+  .identity-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.25rem 1.4rem;
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+  }
+
+  .identity-card .body { min-width: 0; }
+
+  .identity-card .who {
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    color: var(--accent);
+    margin: 0 0 0.3rem;
+  }
+
+  .identity-card .does {
+    font-size: 0.94rem;
+    color: var(--ink);
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .identity-card .note {
+    font-size: 0.85rem;
+    color: var(--ink-faint);
+    margin: 0.45rem 0 0;
+  }
+
+  /* --- Icon chips --- */
+  .chip {
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: var(--surface-sunken);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+  }
+  .chip svg { width: 24px; height: 24px; display: block; }
+  .chip.accent { color: var(--accent); }
+  .chip.ink { color: var(--ink-muted); }
+
+  /* --- Diagram --- */
+  .diagram {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.75rem 1.5rem;
+  }
+
+  .lane {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1rem;
+  }
+  .lane::before {
+    content: "";
+    width: 3px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .lane .who {
+    color: var(--accent);
+    text-transform: none;
+    letter-spacing: 0.02em;
+  }
+
+  .node {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+  }
+  .node .title {
+    font-family: var(--mono);
+    font-size: 0.86rem;
+    color: var(--ink);
+    font-weight: 600;
+    line-height: 1.3;
+  }
+  .node .sub {
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin-top: 0.1rem;
+  }
+  .node.solo { max-width: 340px; margin: 0 auto; }
+
+  .row {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .row .node { flex: 1 1 240px; max-width: 340px; }
+
+  /* horizontal collect strip */
+  .strip {
+    display: flex;
+    align-items: stretch;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.25rem 0.1rem 0.75rem;
+  }
+  .strip .node { flex: none; }
+  .strip .node .title { font-size: 0.8rem; }
+  .step-arrow {
+    flex: none;
+    display: grid;
+    place-items: center;
+    color: var(--ink-faint);
+  }
+  .step-arrow svg { width: 20px; height: 20px; }
+
+  .arrow {
+    display: grid;
+    place-items: center;
+    color: var(--ink-faint);
+    padding: 0.35rem 0;
+  }
+  .arrow svg { width: 22px; height: 22px; }
+  .arrow.tall { padding: 0.6rem 0; }
+
+  .branch-note {
+    text-align: center;
+    font-size: 0.76rem;
+    color: var(--ink-faint);
+    margin: 0.4rem 0 0;
+  }
+  .branch-note code {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 0.9em;
+  }
+
+  /* framework seals */
+  .seal {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 0.75rem;
+    flex: 1 1 160px;
+    max-width: 240px;
+    text-align: center;
+  }
+  .seal .chip { color: var(--accent); }
+  .seal .fw { font-size: 0.9rem; font-weight: 650; color: var(--ink); }
+  .seal .clause { font-family: var(--mono); font-size: 0.74rem; color: var(--ink-faint); margin-top: 0.1rem; }
+
+  /* --- Table --- */
+  .table-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    font-size: 0.92rem;
+  }
+  thead th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
+    padding: 0.85rem 1rem;
+    background: var(--surface-sunken);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  tbody td { padding: 0.85rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.bucket { font-family: var(--mono); font-size: 0.84rem; color: var(--ink); }
+  td.bucket .case-note {
+    display: block;
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+    margin-top: 0.15rem;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.22rem 0.62rem;
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .pill.pass { background: var(--pass-soft); color: var(--pass); }
+  .pill.fail { background: var(--fail-soft); color: var(--fail); }
+  .pill.waived { background: var(--waived-soft); color: var(--waived); }
+
+  /* --- Grading rules --- */
+  .section-intro {
+    color: var(--ink-muted);
+    font-size: 0.95rem;
+    max-width: 64ch;
+    margin: -0.4rem 0 1.25rem;
+  }
+  .rules {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  @media (max-width: 620px) { .rules { grid-template-columns: 1fr; } }
+  .rule {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.9rem 1rem;
+  }
+  .rule.strict { border-color: var(--accent); background: var(--accent-soft); }
+  .rule .fw { font-weight: 650; font-size: 0.9rem; color: var(--ink); }
+  .rule .clause {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    margin-bottom: 0.5rem;
+  }
+  .rule .cond { font-size: 0.85rem; color: var(--ink-muted); }
+  .rule.strict .cond { color: var(--ink); }
+  .rule .cond strong { color: var(--accent); font-weight: 650; }
+  .rule .cond em { font-style: normal; color: var(--ink); font-weight: 600; }
+
+  /* --- Verdict legend --- */
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.1rem 1.5rem;
+    margin-top: 1rem;
+    padding: 0.9rem 1.1rem;
+    background: var(--surface-sunken);
+    border-radius: 10px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+  }
+
+  /* --- Exception register --- */
+  .register {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--waived);
+    border-radius: 10px;
+    padding: 1.25rem 1.4rem;
+  }
+  .register dl {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(90px, auto) 1fr;
+    gap: 0.55rem 1.25rem;
+  }
+  .register dt {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--ink-faint);
+    align-self: center;
+  }
+  .register dd { margin: 0; color: var(--ink); font-size: 0.9rem; align-self: center; }
+  .register dd code { font-family: var(--mono); font-size: 0.85em; color: var(--accent); }
+  .register .rule-note {
+    margin: 1.1rem 0 0;
+    padding-top: 0.95rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.85rem;
+    color: var(--ink-muted);
+  }
+  .register .rule-note code { font-family: var(--mono); font-size: 0.9em; color: var(--fail); }
+
+  /* --- Callout --- */
+  .callout {
+    background: var(--accent-soft);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 1.25rem 1.4rem;
+  }
+  .callout .callout-label {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.5rem;
+  }
+  .callout p { color: var(--ink); margin: 0; font-size: 0.95rem; }
+  .callout p + p { margin-top: 0.65rem; }
+  .callout code { font-family: var(--mono); font-size: 0.88em; }
+
+  .foot {
+    border-top: 1px solid var(--border);
+    padding-top: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--ink-faint);
+  }
+</style>
+
+<!-- Icon symbol set (inline so it works under the artifact CSP) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-terraform" viewBox="0 0 24 24">
+    <polygon points="6,20 10,12 15,12 11,20" fill="#7B42BC"/>
+    <polygon points="6,11 10,3 15,3 11,11" fill="#7B42BC"/>
+    <polygon points="11,11 15,3 20,3 16,11" fill="#9B6DDB"/>
+  </symbol>
+  <symbol id="i-s3" viewBox="0 0 24 24">
+    <polygon points="5.2,7 18.8,7 16.4,19 7.6,19" fill="#3F8624"/>
+    <ellipse cx="12" cy="7" rx="6.8" ry="2.3" fill="#5AA83C"/>
+    <ellipse cx="12" cy="19" rx="4.4" ry="1.3" fill="#2E6B1B"/>
+  </symbol>
+  <symbol id="i-iam" viewBox="0 0 24 24">
+    <path d="M12 2.4 L19.6 5.2 V11 C19.6 15.8 16.3 19.6 12 21.6 C7.7 19.6 4.4 15.8 4.4 11 V5.2 Z" fill="#DD344C"/>
+    <circle cx="12" cy="9.7" r="2" fill="#fff"/>
+    <path d="M11 10.6 h2 l-0.5 4 h-1 z" fill="#fff"/>
+  </symbol>
+  <symbol id="i-kms" viewBox="0 0 24 24">
+    <circle cx="8.6" cy="8.6" r="4" fill="none" stroke="#DD344C" stroke-width="2"/>
+    <path d="M11.4 11.4 L19 19" stroke="#DD344C" stroke-width="2" stroke-linecap="round"/>
+    <path d="M16.7 18.7 l1.6 -1.6 M14.6 16.6 l1.6 -1.6" stroke="#DD344C" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-python" viewBox="0 0 24 24">
+    <path d="M12 3.2 c-2.4 0 -4.3 0.5 -4.3 2.8 V8 h4.5 v0.9 H6.6 c-2.3 0 -3.4 1.7 -3.4 4.1 0 2.4 1 4.1 3.4 4.1 h1.4 v-2.2 c0 -2.4 1.8 -3.9 4.1 -3.9 h4 c2 0 3.2 -1.4 3.2 -3.4 V6 c0 -1.9 -1.6 -2.8 -3.6 -2.8 z" fill="#3776AB"/>
+    <circle cx="9.4" cy="5.9" r="0.95" fill="#fff"/>
+    <path d="M12 20.8 c2.4 0 4.3 -0.5 4.3 -2.8 V16 h-4.5 v-0.9 H17.4 c2.3 0 3.4 -1.7 3.4 -4.1 0 -2.4 -1 -4.1 -3.4 -4.1 h-1.4 v2.2 c0 2.4 -1.8 3.9 -4.1 3.9 h-4 c-2 0 -3.2 1.4 -3.2 3.4 V18 c0 1.9 1.6 2.8 3.6 2.8 z" fill="#FFD343"/>
+    <circle cx="14.6" cy="18.1" r="0.95" fill="#fff"/>
+  </symbol>
+  <symbol id="i-list" viewBox="0 0 24 24">
+    <circle cx="5" cy="6" r="1.5" fill="currentColor"/><rect x="9" y="4.9" width="11" height="2.2" rx="1.1" fill="currentColor"/>
+    <circle cx="5" cy="12" r="1.5" fill="currentColor"/><rect x="9" y="10.9" width="11" height="2.2" rx="1.1" fill="currentColor"/>
+    <circle cx="5" cy="18" r="1.5" fill="currentColor"/><rect x="9" y="16.9" width="11" height="2.2" rx="1.1" fill="currentColor"/>
+  </symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24">
+    <rect x="5" y="10.5" width="14" height="9.5" rx="2" fill="currentColor"/>
+    <path d="M8 10.5 V7.5 a4 4 0 0 1 8 0 V10.5" fill="none" stroke="currentColor" stroke-width="2"/>
+  </symbol>
+  <symbol id="i-tag" viewBox="0 0 24 24">
+    <path d="M3.5 12 L12 3.5 H20 V11.5 L11.5 20 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <circle cx="16" cy="7.5" r="1.6" fill="currentColor"/>
+  </symbol>
+  <symbol id="i-evidence" viewBox="0 0 24 24">
+    <rect x="5" y="3" width="14" height="18" rx="2.2" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="M10.5 8 q-1.5 0 -1.5 2 q0 2 -1.5 2 q1.5 0 1.5 2 q0 2 1.5 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M13.5 8 q1.5 0 1.5 2 q0 2 1.5 2 q-1.5 0 -1.5 2 q0 2 -1.5 2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-seal" viewBox="0 0 24 24">
+    <path d="M12 2.4 L19.6 5.2 V11 C19.6 15.8 16.3 19.6 12 21.6 C7.7 19.6 4.4 15.8 4.4 11 V5.2 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M8.4 11.6 l2.6 2.6 L16 9.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-json" viewBox="0 0 24 24">
+    <path d="M6 3 H14 L18 7 V21 H6 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M14 3 V7 H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M11 11.5 q-1.3 0 -1.3 1.5 q0 1.5 -1.2 1.5 q1.2 0 1.2 1.5 q0 1.5 1.3 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M13.4 11.5 q1.3 0 1.3 1.5 q0 1.5 1.2 1.5 q-1.2 0 -1.2 1.5 q0 1.5 -1.3 1.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-csv" viewBox="0 0 24 24">
+    <path d="M6 3 H14 L18 7 V21 H6 Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M14 3 V7 H18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+    <path d="M8.5 12.5 H15.5 M8.5 15.5 H15.5 M11.5 11 V17" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24">
+    <path d="M6 9 L12 15 L18 9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-right" viewBox="0 0 24 24">
+    <path d="M9 6 L15 12 L9 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<div class="page">
+  <p class="eyebrow">Control UC-04 — S3 Encryption at Rest</p>
+  <h1>One evidence pull, graded three ways</h1>
+  <p class="lede">
+    A single read-only check against each S3 bucket produces one evidence record.
+    That record is never re-collected — it's simply graded against SOC&nbsp;2, ISO&nbsp;27001,
+    and NIST&nbsp;800-53's different pass bars.
+  </p>
+
+  <div class="identity-row">
+    <div class="identity-card">
+      <span class="chip"><svg><use href="#i-terraform"/></svg></span>
+      <div class="body">
+        <p class="who">grc-lab-admin</p>
+        <p class="does">Builds the test environment</p>
+        <p class="note">Terraform only. Creates buckets, KMS key, IAM policy. Never runs the collector.</p>
+      </div>
+    </div>
+    <div class="identity-card">
+      <span class="chip"><svg><use href="#i-python"/></svg></span>
+      <div class="body">
+        <p class="who">grc-lab-readonly</p>
+        <p class="does">Collects evidence</p>
+        <p class="note">Five read-only permissions. Cannot create, modify, or delete anything.</p>
+      </div>
+    </div>
+  </div>
+
+  <section>
+    <h2><span class="step">01</span> Pipeline</h2>
+    <div class="diagram">
+
+      <p class="lane"><span class="who">grc-lab-admin</span> · provision (one time)</p>
+      <div class="node solo">
+        <span class="chip"><svg><use href="#i-terraform"/></svg></span>
+        <div><div class="title">terraform apply</div><div class="sub">infrastructure as code</div></div>
+      </div>
+      <div class="arrow"><svg><use href="#i-chevron"/></svg></div>
+      <div class="row">
+        <div class="node">
+          <span class="chip"><svg><use href="#i-s3"/></svg></span>
+          <div><div class="title">5 test buckets</div><div class="sub">one per pass/fail case</div></div>
+        </div>
+        <div class="node">
+          <span class="chip"><svg><use href="#i-iam"/></svg></span>
+          <div><div class="title">read-only IAM policy</div><div class="sub">5 permissions, no writes</div></div>
+        </div>
+      </div>
+      <p class="branch-note">IAM policy is attached to <code>grc-lab-readonly</code> — the identity the collector runs as</p>
+
+      <div class="arrow tall"><svg><use href="#i-chevron"/></svg></div>
+
+      <p class="lane"><span class="who">grc-lab-readonly</span> · collect (read-only, repeatable)</p>
+      <div class="strip">
+        <div class="node">
+          <span class="chip ink"><svg><use href="#i-list"/></svg></span>
+          <div><div class="title">ListBuckets</div></div>
+        </div>
+        <div class="step-arrow"><svg><use href="#i-right"/></svg></div>
+        <div class="node">
+          <span class="chip accent"><svg><use href="#i-lock"/></svg></span>
+          <div><div class="title">GetEncryption&shy;Configuration</div></div>
+        </div>
+        <div class="step-arrow"><svg><use href="#i-right"/></svg></div>
+        <div class="node">
+          <span class="chip"><svg><use href="#i-kms"/></svg></span>
+          <div><div class="title">DescribeKey</div><div class="sub">who owns the key?</div></div>
+        </div>
+        <div class="step-arrow"><svg><use href="#i-right"/></svg></div>
+        <div class="node">
+          <span class="chip accent"><svg><use href="#i-tag"/></svg></span>
+          <div><div class="title">GetBucketTagging</div><div class="sub">exception check</div></div>
+        </div>
+      </div>
+
+      <div class="arrow tall"><svg><use href="#i-chevron"/></svg></div>
+
+      <div class="node solo">
+        <span class="chip accent"><svg><use href="#i-evidence"/></svg></span>
+        <div><div class="title">one evidence object / bucket</div><div class="sub">normalized schema — collected once</div></div>
+      </div>
+
+      <div class="arrow tall"><svg><use href="#i-chevron"/></svg></div>
+
+      <p class="lane">grade — same evidence, three pass bars</p>
+      <div class="row">
+        <div class="seal">
+          <span class="chip"><svg><use href="#i-seal"/></svg></span>
+          <div><div class="fw">SOC 2</div><div class="clause">CC6.1</div></div>
+        </div>
+        <div class="seal">
+          <span class="chip"><svg><use href="#i-seal"/></svg></span>
+          <div><div class="fw">ISO 27001</div><div class="clause">A.8.24</div></div>
+        </div>
+        <div class="seal">
+          <span class="chip"><svg><use href="#i-seal"/></svg></span>
+          <div><div class="fw">NIST 800-53</div><div class="clause">SC-28(1)</div></div>
+        </div>
+      </div>
+
+      <div class="arrow tall"><svg><use href="#i-chevron"/></svg></div>
+
+      <p class="lane">output</p>
+      <div class="row">
+        <div class="node">
+          <span class="chip accent"><svg><use href="#i-json"/></svg></span>
+          <div><div class="title">evidence-output.json</div><div class="sub">full audit trail</div></div>
+        </div>
+        <div class="node">
+          <span class="chip accent"><svg><use href="#i-csv"/></svg></span>
+          <div><div class="title">evidence-output.csv</div><div class="sub">auditor summary</div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">02</span> Why each verdict — same evidence, three pass bars</h2>
+    <p class="section-intro">
+      Every bucket produces one evidence object. Each framework then applies its
+      own rule to it — which is why the same bucket can PASS two frameworks and
+      FAIL the third.
+    </p>
+    <div class="rules">
+      <div class="rule">
+        <div class="fw">SOC 2</div>
+        <div class="clause">CC6.1</div>
+        <div class="cond">PASS if <strong>any</strong> encryption is present</div>
+      </div>
+      <div class="rule">
+        <div class="fw">ISO 27001</div>
+        <div class="clause">A.8.24</div>
+        <div class="cond">PASS if <strong>any</strong> encryption is present</div>
+      </div>
+      <div class="rule strict">
+        <div class="fw">NIST 800-53</div>
+        <div class="clause">SC-28(1)</div>
+        <div class="cond">PASS <em>only</em> with SSE-KMS <em>and</em> a customer-managed key</div>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Bucket case</th>
+            <th>SOC&nbsp;2 CC6.1</th>
+            <th>ISO 27001 A.8.24</th>
+            <th>NIST SC-28(1)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="bucket">sse-s3-aes256<span class="case-note">SSE-S3, no KMS involved</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill fail">FAIL</span></td>
+          </tr>
+          <tr>
+            <td class="bucket">sse-kms-aws-managed<span class="case-note">KMS key owned by AWS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill fail">FAIL</span></td>
+          </tr>
+          <tr>
+            <td class="bucket">sse-kms-customer-managed<span class="case-note">KMS key owned by the account</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+          </tr>
+          <tr>
+            <td class="bucket">baseline-default-only<span class="case-note">no config set — AWS default applied</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill pass">PASS</span></td>
+            <td><span class="pill fail">FAIL</span></td>
+          </tr>
+          <tr>
+            <td class="bucket">waived-exception<span class="case-note">tagged + documented reason</span></td>
+            <td><span class="pill waived">WAIVED</span></td>
+            <td><span class="pill waived">WAIVED</span></td>
+            <td><span class="pill waived">WAIVED</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="legend">
+      <span class="legend-item"><span class="pill pass">PASS</span> meets that framework's rule</span>
+      <span class="legend-item"><span class="pill fail">FAIL</span> does not meet the rule</span>
+      <span class="legend-item"><span class="pill waived">WAIVED</span> fails the rule, but a documented exception is on file</span>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">03</span> Exception register — the WAIVED case</h2>
+    <p class="section-intro">
+      WAIVED is not a pass. It means the bucket fails the technical check but has an
+      approved, documented reason — so it's tracked here instead of counted as a
+      failure. This is the record an auditor asks to see for any waived item.
+    </p>
+    <div class="register">
+      <dl>
+        <dt>Resource</dt>
+        <dd>grc-evidence-lab-waived-exception</dd>
+        <dt>Status</dt>
+        <dd><span class="pill waived">WAIVED</span></dd>
+        <dt>Reason</dt>
+        <dd>Legacy migration bucket — decommission scheduled Q3</dd>
+        <dt>Ticket</dt>
+        <dd>JIRA-1234</dd>
+        <dt>Source</dt>
+        <dd>bucket tags: <code>compliance-exception=true</code> + <code>exception_reason</code></dd>
+      </dl>
+      <p class="rule-note">
+        The check that keeps this honest: a bucket tagged
+        <code>compliance-exception=true</code> with <strong>no</strong>
+        <code>exception_reason</code> stays a FAIL — an undocumented exception is not a waiver.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="step">04</span> Finding worth knowing</h2>
+    <div class="callout">
+      <p class="callout-label">AWS default encryption, since Jan 2023</p>
+      <p>
+        Every S3 bucket gets SSE-S3 applied automatically and it cannot be turned off —
+        even <code>baseline-default-only</code>, which has zero encryption configuration
+        in Terraform, still reports as encrypted.
+      </p>
+      <p>
+        SOC&nbsp;2 and ISO's "no encryption present" fail case is now unreachable in live AWS.
+        NIST SC-28(1)'s customer-managed-key requirement is the only bar left that still
+        demands deliberate action rather than relying on the provider's floor.
+      </p>
+    </div>
+  </section>
+
+  <div class="foot">
+    <span>control-spec.md · evidence_collector.py · test_evidence_collector.py</span>
+    <span>UC-04 lab</span>
+  </div>
+</div>
