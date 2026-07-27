@@ -1,13 +1,11 @@
-# S3 encryption evidence collector
+# Cloud control crosswalk
 
-Reads the encryption setting on every S3 bucket in an AWS account and checks it
-against three compliance frameworks in one pass: SOC 2 CC6.1, ISO 27001 A.8.24,
+Map one cloud security control to several compliance frameworks from a single
+piece of evidence, instead of checking each framework separately. This lab does
+it for AWS S3 encryption at rest, graded against SOC 2 CC6.1, ISO 27001 A.8.24,
 and NIST 800-53 SC-28(1).
 
-The idea is to collect the evidence once and grade it against each framework,
-instead of running a separate check per framework.
-
-**Visual overview:** https://dev-kfarmer.github.io/grc-s3-encryption-crosswalk/visual-overview.html
+**Visual overview:** https://dev-kfarmer.github.io/grc-cloud-control-crosswalk/visual-overview.html
 — the pipeline, the pass/fail matrix, and the exception register on one page.
 
 ## Why the frameworks disagree
