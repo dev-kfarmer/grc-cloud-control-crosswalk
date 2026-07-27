@@ -1,0 +1,53 @@
+# --- Credentials & secrets ---
+# AWS credentials should NEVER live in this repo — they live in ~/.aws/credentials
+# outside this folder. This is just a safety net in case anything gets copied in.
+.env
+.env.*
+*.pem
+*.key
+credentials
+**/credentials
+*_rsa
+*_rsa.pub
+
+# --- Terraform ---
+# State files can contain resource attributes (including some sensitive values)
+# in plaintext. Never commit these.
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+tfplan
+crash.log
+crash.*.log
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.venv/
+venv/
+env/
+
+# --- Evidence output (contains real AWS account ID / bucket names) ---
+# Keep the schema/examples, not real account evidence dumps, unless you
+# deliberately want to showcase sanitized sample output.
+evidence-output.json
+evidence-output.csv
+exceptions.csv
+evidence-output/
+*.evidence.json
+
+# --- Private working notes (not for public repo) ---
+# Contains personal project context; kept local to guide work, never published.
+CLAUDE.md
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+.vscode/settings.json
