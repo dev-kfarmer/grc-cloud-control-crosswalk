@@ -84,3 +84,19 @@ to meet.
 - One control, done end to end, rather than many at a surface level.
 - `grc-lab-readonly` uses a long-lived access key. A production setup would use
   short-lived role-based credentials instead.
+
+# KNOWN LIMITATION - FUTURE IMPROVEMENT
+    # This loads a long-lived IAM user access key from the local AWS profile.
+    # That key never expires, so if it leaks it works forever until someone
+    # notices and manually revokes it.
+    #
+    # The fix is to stop using a permanent identity:
+    #   Better - assume an IAM role via STS, which issues temporary credentials
+    #            that expire in about an hour instead of a permanent key.
+    #   Best   - use a workload identity with no stored secret at all, such as
+    #            GitHub Actions via OIDC or an EC2 instance profile, so there is
+    #            no long-lived credential anywhere to leak.
+    #
+    # A role also improves the evidence itself: each run assumes the role with
+    # its own session name, so CloudTrail shows which run made which call,
+    # instead of every run looking like the same shared user.
