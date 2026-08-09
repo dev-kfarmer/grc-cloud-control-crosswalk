@@ -1,0 +1,32 @@
+# Keep the build context minimal and free of anything sensitive.
+# Everything not explicitly COPYed is excluded anyway, but a tight context
+# means credentials and state can never be captured by a stray COPY .
+
+.git
+.gitignore
+.github
+
+# Terraform state can contain resource metadata and must never enter an image
+terraform/
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# Local AWS config / anything credential-shaped
+.aws/
+*.pem
+*.key
+.env
+.env.*
+
+# Test and docs output
+test_evidence_collector.py
+visual-overview.html
+*.csv
+*.json
+__pycache__/
+*.pyc
+.pytest_cache/
+venv/
+.venv/

@@ -85,7 +85,7 @@ to meet.
 - `grc-lab-readonly` uses a long-lived access key. A production setup would use
   short-lived role-based credentials instead.
 
-# KNOWN LIMITATION - FUTURE IMPROVEMENT
+# FUTURE IMPROVEMENT
     # This loads a long-lived IAM user access key from the local AWS profile.
     # That key never expires, so if it leaks it works forever until someone
     # notices and manually revokes it.
@@ -100,3 +100,35 @@ to meet.
     # A role also improves the evidence itself: each run assumes the role with
     # its own session name, so CloudTrail shows which run made which call,
     # instead of every run looking like the same shared user.
+## DOCKER Running in a container
+
+The collector ships as a container image — the script plus everything it needs to run,
+in one sealed unit. How that unit is built is itself a set of security decisions:
+
+| Build decision | Why it matters | Control |
+|---|---|---|
+| Minimal base image — no shell, no package manager | An attacker who gets in has no tools to work with, and nothing new can be installed | NIST 800-53 CM-7 |
+| Build tools stay in a separate stage | Only the interpreter, dependencies, and app code ship | NIST 800-53 CM-7 |
+| Runs as a normal user, not root | A compromised process can't reconfigure the container | NIST 800-53 AC-6 · SOC 2 CC6.1 |
+| No credentials in the image | AWS identity is mounted read-only at run time; the image alone grants no access | NIST 800-53 IA-5 |
+
+**47.2 MB**, versus roughly 1 GB for a standard `python:3.12` base — about 95% less
+software that could be attacked.
+
+### Build and run
+
+    docker build -t grc-evidence-collector .
+    docker run --rm -v "${HOME}/.aws:/home/nonroot/.aws:ro" grc-evidence-collector
+
+### Known limitations
+
+- Read-only root filesystem and dropped capabilities are runtime settings, not Dockerfile
+  directives. They belong in a Kubernetes pod spec — next phase of this lab.
+- Output is written to the container's working directory, which is ephemeral. The path
+  should be configurable before this runs on a schedule.
+- Identity is still a long-lived IAM user key mounted from the host. The production path
+  is a task role via STS. Documented bootstrap exception, not a recommendation.
+
+Control mappings are deliberately narrow. Claiming broad coverage for a Dockerfile would
+repeat the problem this lab exists to expose: an assertion that sounds strong and tests
+nothing.
