@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why Docker &mdash; GRC cloud control crosswalk</title>
+<style>
+  :root {
+    --bg: #F2F4F8;
+    --surface: #FFFFFF;
+    --surface-sunken: #E9ECF3;
+    --ink: #1B2333;
+    --ink-muted: #57627A;
+    --ink-faint: #8792A8;
+    --border: #DBE0EA;
+    --accent: #4453C4;
+    --accent-soft: #EAECFA;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", "Inter", ui-sans-serif, system-ui, sans-serif;
+  }
+  :root[data-theme="dark"] {
+    --bg: #10141C; --surface: #171C27; --surface-sunken: #1E2431;
+    --ink: #E7EBF3; --ink-muted: #9AA4BA; --ink-faint: #6B7690;
+    --border: #2A3140; --accent: #8B96F2; --accent-soft: #232A47;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #10141C; --surface: #171C27; --surface-sunken: #1E2431;
+      --ink: #E7EBF3; --ink-muted: #9AA4BA; --ink-faint: #6B7690;
+      --border: #2A3140; --accent: #8B96F2; --accent-soft: #232A47;
+    }
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font-family:var(--sans); line-height:1.6; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:900px; margin:0 auto; padding:56px 28px 76px; }
+
+  .eyebrow { font-family:var(--mono); font-size:.72rem; letter-spacing:.13em; text-transform:uppercase; color:var(--accent); }
+  h1 { font-size:1.95rem; font-weight:650; letter-spacing:-.025em; line-height:1.16; margin:10px 0 14px; }
+  .thesis { font-size:1.04rem; color:var(--ink-muted); max-width:650px; }
+  .links { margin-top:22px; display:flex; gap:18px; flex-wrap:wrap; font-size:.87rem; }
+  .links a { color:var(--accent); text-decoration:none; border-bottom:1px solid var(--accent); padding-bottom:1px; opacity:.9; }
+  .links a:hover { opacity:1; }
+
+  section { margin-top:48px; }
+  h2 { font-size:1.13rem; font-weight:600; display:flex; align-items:baseline; gap:12px; letter-spacing:-.01em; }
+  h2 .n { font-family:var(--mono); font-size:.76rem; color:var(--ink-faint); font-weight:400; }
+  .intro { color:var(--ink-muted); margin-top:14px; font-size:.95rem; max-width:670px; }
+
+  .chip { flex:none; width:42px; height:42px; border-radius:10px; background:var(--surface-sunken);
+          border:1px solid var(--border); display:grid; place-items:center; color:var(--ink-muted); }
+  .chip svg { width:24px; height:24px; display:block; }
+  .chip.accent { color:var(--accent); }
+
+  .lane { display:flex; align-items:stretch; gap:10px; margin-top:16px; }
+  @media (max-width:760px) { .lane { flex-direction:column; } .arw { transform:rotate(90deg); height:24px; width:100%; } }
+  .node { flex:1; min-width:0; border:1px solid var(--border); border-radius:12px; background:var(--surface);
+          padding:16px; display:flex; flex-direction:column; gap:11px; }
+  .node.on { border-color:var(--accent); background:var(--accent-soft); }
+  .node.dead { border-style:dashed; background:transparent; }
+  .node .ttl { font-size:.93rem; font-weight:600; line-height:1.3; }
+  .node .sub { font-size:.82rem; color:var(--ink-muted); line-height:1.45; margin-top:4px; }
+  .arw { flex:none; display:grid; place-items:center; color:var(--ink-faint); width:22px; }
+  .arw svg { width:18px; height:18px; }
+
+  .lane-label { font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase;
+                color:var(--ink-faint); margin-top:20px; }
+  .lane-label.on { color:var(--accent); }
+
+  .cards { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:16px; }
+  @media (max-width:660px) { .cards { grid-template-columns:1fr; } }
+  .card { border:1px solid var(--border); border-radius:12px; background:var(--surface); padding:18px;
+          display:flex; gap:14px; align-items:flex-start; }
+  .card .body { min-width:0; }
+  .card .ct { font-size:.94rem; font-weight:600; margin-bottom:5px; }
+  .card .cd { font-size:.85rem; color:var(--ink-muted); line-height:1.5; }
+  .card .tag { display:inline-block; margin-top:10px; font-family:var(--mono); font-size:.68rem;
+               letter-spacing:.04em; color:var(--accent); background:var(--accent-soft);
+               border-radius:999px; padding:4px 10px; }
+
+  .stat { display:flex; align-items:center; gap:16px; flex-wrap:wrap; border:1px solid var(--border);
+          border-radius:12px; background:var(--surface); padding:20px 22px; margin-top:16px; }
+  .stat .big { font-size:1.85rem; font-weight:650; letter-spacing:-.03em; color:var(--accent); }
+  .stat .vs { font-size:.93rem; color:var(--ink-muted); }
+  .stat .note { flex-basis:100%; font-size:.85rem; color:var(--ink-faint); margin-top:2px; }
+
+  .run { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:19px 21px;
+         margin-top:16px; font-family:var(--mono); font-size:.81rem; color:var(--ink-muted); overflow-x:auto; }
+  .run div + div { margin-top:7px; }
+  .run .c { color:var(--ink-faint); }
+  code { font-family:var(--mono); font-size:.87em; color:var(--ink); }
+
+  footer { margin-top:56px; padding-top:20px; border-top:1px solid var(--border);
+           font-family:var(--mono); font-size:.71rem; letter-spacing:.08em; text-transform:uppercase;
+           color:var(--ink-faint); display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-python" viewBox="0 0 24 24">
+    <path d="M12 3.2 c-2.4 0 -4.3 0.5 -4.3 2.8 V8 h4.5 v0.9 H6.6 c-2.3 0 -3.4 1.7 -3.4 4.1 0 2.4 1 4.1 3.4 4.1 h1.4 v-2.2 c0 -2.4 1.8 -3.9 4.1 -3.9 h4 c2 0 3.2 -1.4 3.2 -3.4 V6 c0 -1.9 -1.6 -2.8 -3.6 -2.8 z" fill="#3776AB"/>
+    <circle cx="9.4" cy="5.9" r="0.95" fill="#fff"/>
+    <path d="M12 20.8 c2.4 0 4.3 -0.5 4.3 -2.8 V16 h-4.5 v-0.9 H17.4 c2.3 0 3.4 -1.7 3.4 -4.1 0 -2.4 -1 -4.1 -3.4 -4.1 h-1.4 v2.2 c0 2.4 -1.8 3.9 -4.1 3.9 h-4 c-2 0 -3.2 1.4 -3.2 3.4 V18 c0 1.9 1.6 2.8 3.6 2.8 z" fill="#FFD343"/>
+    <circle cx="14.6" cy="18.1" r="0.95" fill="#fff"/>
+  </symbol>
+
+  <symbol id="i-docker" viewBox="0 0 24 24">
+    <rect x="5.4" y="10.6" width="2.6" height="2.4" fill="#2496ED"/>
+    <rect x="8.5" y="10.6" width="2.6" height="2.4" fill="#2496ED"/>
+    <rect x="11.6" y="10.6" width="2.6" height="2.4" fill="#2496ED"/>
+    <rect x="8.5" y="7.8" width="2.6" height="2.4" fill="#2496ED"/>
+    <rect x="11.6" y="7.8" width="2.6" height="2.4" fill="#2496ED"/>
+    <rect x="11.6" y="5" width="2.6" height="2.4" fill="#2496ED"/>
+    <path d="M3 13.6 h15.2 c0.4 1.2 0.2 2.6 -0.6 3.7 -1.3 1.8 -3.6 2.7 -6.6 2.7 -3.4 0 -6 -1.4 -7.2 -3.9 -0.4 -0.8 -0.7 -1.6 -0.8 -2.5 z" fill="#2496ED"/>
+    <path d="M18.7 11.6 c0.9 -0.7 1.7 -0.6 2.4 0 0.3 -1 0 -1.9 -0.6 -2.4 0.7 -0.9 2 -0.5 2.1 -0.4 -0.5 -1.3 -1.6 -1.8 -2.9 -1.5 -0.5 0.9 -1.3 2.5 -1 4.3 z" fill="#2496ED"/>
+  </symbol>
+
+  <symbol id="i-chainguard" viewBox="0 0 24 24">
+    <path d="M12 2.4 L19.6 5.2 V11 C19.6 15.8 16.3 19.6 12 21.6 C7.7 19.6 4.4 15.8 4.4 11 V5.2 Z" fill="#7B5CF0"/>
+    <rect x="9" y="11" width="6" height="5" rx="1.1" fill="#fff"/>
+    <path d="M10.3 11 V9.6 a1.7 1.7 0 0 1 3.4 0 V11" fill="none" stroke="#fff" stroke-width="1.5"/>
+  </symbol>
+
+  <symbol id="i-aws" viewBox="0 0 24 24">
+    <circle cx="8.2" cy="10.4" r="3.9" fill="none" stroke="#FF9900" stroke-width="2.1"/>
+    <path d="M11.9 10.4 H20.4 M17.6 10.4 v3.1 M14.7 10.4 v2.3" fill="none" stroke="#FF9900" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M3.6 18.4 c2.9 1.6 6.4 2.2 9.9 1.6 1.7 -0.3 3.3 -0.9 4.8 -1.8 0.4 -0.2 0.7 0.2 0.3 0.5 -1.8 1.5 -4.1 2.4 -6.6 2.6 -3.2 0.2 -6.2 -0.8 -8.6 -2.6 -0.3 -0.2 -0.1 -0.5 0.2 -0.3 z" fill="#FF9900"/>
+  </symbol>
+
+  <symbol id="i-laptop" viewBox="0 0 24 24">
+    <rect x="4" y="5" width="16" height="11" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M2 19h20" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-server" viewBox="0 0 24 24">
+    <rect x="3" y="4" width="18" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <rect x="3" y="13" width="18" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M7 7.5h.01M7 16.5h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M12 7v5.2l3.4 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M6.5 6.5l11 11" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24">
+    <path d="M12 3.5 21 8l-9 4.5L3 8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+    <path d="M3 12.5 12 17l9-4.5M3 16.5 12 21l9-4.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-user" viewBox="0 0 24 24">
+    <circle cx="12" cy="8" r="3.6" fill="none" stroke="currentColor" stroke-width="1.7"/>
+    <path d="M5 20c0-3.6 3.1-5.6 7-5.6s7 2 7 5.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24">
+    <path d="M6 3h8l4 4v14H6z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+    <path d="M14 3v4h4M9 12.5h6M9 16h6" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+  <symbol id="i-right" viewBox="0 0 24 24">
+    <path d="M5 12h13M13 6.5 18.5 12 13 17.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+  </symbol>
+</svg>
+
+<div class="wrap">
+
+  <p class="eyebrow">Docker layer</p>
+  <h1>Why put a compliance check in a Docker image?</h1>
+  <p class="thesis">
+    A script that only runs on one laptop is a demo. Building it into a Docker image is what turns it
+    into a control that runs on its own &mdash; and what gets left out of that image is a security
+    decision in itself.
+  </p>
+  <p class="links">
+    <a href="./visual-overview.html">&larr; Evidence collector overview</a>
+    <a href="https://github.com/dev-kfarmer/grc-cloud-control-crosswalk">Repository</a>
+  </p>
+
+  <section>
+    <h2><span class="n">01</span> The problem</h2>
+
+    <p class="lane-label">Before Docker</p>
+    <div class="lane">
+      <div class="node">
+        <span class="chip"><svg><use href="#i-python"/></svg></span>
+        <div>
+          <p class="ttl">The script</p>
+          <p class="sub">Reads live S3 config, grades it against three frameworks</p>
+        </div>
+      </div>
+      <div class="arw"><svg><use href="#i-right"/></svg></div>
+      <div class="node">
+        <span class="chip"><svg><use href="#i-laptop"/></svg></span>
+        <div>
+          <p class="ttl">One laptop</p>
+          <p class="sub">Depends on the Python and boto3 installed on that machine</p>
+        </div>
+      </div>
+      <div class="arw"><svg><use href="#i-right"/></svg></div>
+      <div class="node dead">
+        <span class="chip"><svg><use href="#i-stop"/></svg></span>
+        <div>
+          <p class="ttl">Runs when you run it</p>
+          <p class="sub">Evidence is a point in time, gathered by hand</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">02</span> What Docker changes</h2>
+
+    <p class="lane-label on">After Docker</p>
+    <div class="lane">
+      <div class="node">
+        <span class="chip"><svg><use href="#i-docker"/></svg></span>
+        <div>
+          <p class="ttl">One Docker image</p>
+          <p class="sub">Script and its dependencies sealed into a single versioned unit</p>
+        </div>
+      </div>
+      <div class="arw"><svg><use href="#i-right"/></svg></div>
+      <div class="node">
+        <span class="chip"><svg><use href="#i-server"/></svg></span>
+        <div>
+          <p class="ttl">Any machine</p>
+          <p class="sub">Server, cluster, or cloud runner &mdash; behaves identically</p>
+        </div>
+      </div>
+      <div class="arw"><svg><use href="#i-right"/></svg></div>
+      <div class="node on">
+        <span class="chip accent"><svg><use href="#i-clock"/></svg></span>
+        <div>
+          <p class="ttl">On a schedule</p>
+          <p class="sub">Evidence collected continuously, with nobody in the loop</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="intro">
+      That last step is the point. A control checked once by hand is a screenshot with extra steps.
+      A control checked every day on its own is continuous monitoring &mdash; and because the image is
+      versioned, the evidence produced last quarter traces back to an exact build.
+    </p>
+  </section>
+
+  <section>
+    <h2><span class="n">03</span> What the image build decided</h2>
+    <p class="intro" style="margin-top:9px">
+      Running this anywhere other than one laptop means shipping an environment with it. The only real
+      question was how much environment to bring &mdash; and each answer in the Dockerfile maps to a control.
+    </p>
+
+    <div class="stat">
+      <span class="big">47.2 MB</span>
+      <span class="vs">against roughly 1 GB for a standard <code>python:3.12</code> base</span>
+      <span class="note">
+        The script is a few kilobytes either way. Everything else that travels with it has to be
+        patched and scanned, whether the script uses it or not.
+      </span>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <span class="chip"><svg><use href="#i-chainguard"/></svg></span>
+        <div class="body">
+          <p class="ct">Chainguard distroless base</p>
+          <p class="cd">No shell and no package manager, so nothing can be installed into a running container and common payloads that call a shell simply fail.</p>
+          <span class="tag">NIST CM-7</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="chip"><svg><use href="#i-layers"/></svg></span>
+        <div class="body">
+          <p class="ct">Multi-stage build</p>
+          <p class="cd">pip and the build stage never reach the shipped image. Only the interpreter, boto3, and the app code ship.</p>
+          <span class="tag">NIST CM-7</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="chip"><svg><use href="#i-user"/></svg></span>
+        <div class="body">
+          <p class="ct">Runs as a normal user</p>
+          <p class="cd">Declared explicitly in the Dockerfile rather than inherited, so the privilege decision is visible to anyone reviewing it.</p>
+          <span class="tag">NIST AC-6 &middot; SOC 2 CC6.1</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <span class="chip"><svg><use href="#i-aws"/></svg></span>
+        <div class="body">
+          <p class="ct">No credentials in the image</p>
+          <p class="cd">AWS identity is mounted read-only when the container runs. Anyone who obtains the image gets no access to the account.</p>
+          <span class="tag">NIST IA-5</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2><span class="n">04</span> Build and run</h2>
+    <div class="run">
+      <div><span class="c"># build the image</span></div>
+      <div>docker build -t grc-evidence-collector .</div>
+      <div>&nbsp;</div>
+      <div><span class="c"># identity is mounted at run time, never baked in</span></div>
+      <div>docker run --rm -v "${HOME}/.aws:/home/nonroot/.aws:ro" grc-evidence-collector</div>
+    </div>
+    <p class="intro">
+      Known limitations and the production identity path are documented in the repository README.
+    </p>
+  </section>
+
+  <footer>
+    <span>Dockerfile &middot; .dockerignore &middot; evidence_collector.py</span>
+    <span>Personal lab &middot; own AWS account</span>
+  </footer>
+
+</div>
+</body>
+</html>
