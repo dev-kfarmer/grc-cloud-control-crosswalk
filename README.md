@@ -85,7 +85,7 @@ to meet.
 - `grc-lab-readonly` uses a long-lived access key. A production setup would use
   short-lived role-based credentials instead.
 
-# FUTURE IMPROVEMENT
+### FUTURE IMPROVEMENT
     # This loads a long-lived IAM user access key from the local AWS profile.
     # That key never expires, so if it leaks it works forever until someone
     # notices and manually revokes it.
@@ -100,20 +100,34 @@ to meet.
     # A role also improves the evidence itself: each run assumes the role with
     # its own session name, so CloudTrail shows which run made which call,
     # instead of every run looking like the same shared user.
-## DOCKER Running in a container
+## Running it in Docker
 
-The collector ships as a container image — the script plus everything it needs to run,
-in one sealed unit. How that unit is built is itself a set of security decisions:
+A script that only runs on one laptop is a demo. It depends on whatever Python
+and boto3 are installed there, and it only produces evidence when someone
+remembers to run it.
+
+**[Visual walkthrough of the Docker layer →](https://dev-kfarmer.github.io/grc-cloud-control-crosswalk/docker-overview.html)**
+
+Building it into a Docker image fixes both: the collector and its dependencies
+become one sealed, versioned unit that behaves identically on a server, a
+cluster, or a cloud runner — which is what makes it possible to run on a
+schedule with nobody in the loop. A control checked once by hand is a screenshot
+with extra steps. A control checked daily on its own is continuous monitoring.
+
+Shipping it anywhere also means shipping an environment with it, and the only
+real question was how much environment to bring. Each answer in the Dockerfile
+maps to a control:
 
 | Build decision | Why it matters | Control |
 |---|---|---|
-| Minimal base image — no shell, no package manager | An attacker who gets in has no tools to work with, and nothing new can be installed | NIST 800-53 CM-7 |
-| Build tools stay in a separate stage | Only the interpreter, dependencies, and app code ship | NIST 800-53 CM-7 |
-| Runs as a normal user, not root | A compromised process can't reconfigure the container | NIST 800-53 AC-6 · SOC 2 CC6.1 |
+| Chainguard distroless base — no shell, no package manager | Nothing can be installed into a running container, and common payloads that call a shell fail | NIST 800-53 CM-7 |
+| Multi-stage build — pip stays behind | Only the interpreter, boto3, and app code ship | NIST 800-53 CM-7 |
+| Runs as a normal user, not root | Declared explicitly, so the privilege decision is visible to a reviewer | NIST 800-53 AC-6 · SOC 2 CC6.1 |
 | No credentials in the image | AWS identity is mounted read-only at run time; the image alone grants no access | NIST 800-53 IA-5 |
 
-**47.2 MB**, versus roughly 1 GB for a standard `python:3.12` base — about 95% less
-software that could be attacked.
+**47.2 MB**, versus roughly 1 GB for a standard `python:3.12` base. The script is
+a few kilobytes either way — everything else that travels with it has to be
+patched and scanned, whether the script uses it or not.
 
 ### Build and run
 
