@@ -114,6 +114,9 @@ cluster, or a cloud runner — which is what makes it possible to run on a
 schedule with nobody in the loop. A control checked once by hand is a screenshot
 with extra steps. A control checked daily on its own is continuous monitoring.
 
+**[Visual walkthrough of the automation layer →](https://dev-kfarmer.github.io/grc-cloud-control-crosswalk/automation-overview.html)**
+— how OIDC and GitHub Actions run this on a schedule with no stored credentials.
+
 Shipping it anywhere also means shipping an environment with it, and the only
 real question was how much environment to bring. Each answer in the Dockerfile
 maps to a control:
