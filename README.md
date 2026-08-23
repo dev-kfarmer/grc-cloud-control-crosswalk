@@ -142,6 +142,10 @@ patched and scanned, whether the script uses it or not.
   should be configurable before this runs on a schedule.
 - Identity is still a long-lived IAM user key mounted from the host. The production path
   is a task role via STS. Documented bootstrap exception, not a recommendation.
+- Scope is the whole account. `list_buckets` enumerates every bucket and assumes each is
+  readable; most aren't in audit scope, and a broader identity surfaces buckets the evidence
+  policy can't `GetBucketTagging`. Production would scope to a tagged subset (e.g.
+  `Environment=prod`) reflecting the audit boundary. control-spec.md anticipates this.
 
 Control mappings are deliberately narrow. Claiming broad coverage for a Dockerfile would
 repeat the problem this lab exists to expose: an assertion that sounds strong and tests

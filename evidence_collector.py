@@ -7,7 +7,11 @@ three compliance frameworks: SOC 2 CC6.1, ISO 27001 A.8.24, NIST 800-53
 SC-28(1). This is the "assess once, comply with many" pattern -- evidence is
 collected once per bucket, never re-fetched per framework.
 
-Run with the read-only 'grc-lab' AWS CLI profile:
+Credentials: set AWS_PROFILE to use a named local profile (e.g. the read-only
+'grc-lab' profile); leave it unset in CI (GitHub Actions OIDC) so boto3's default
+credential chain is used. OUTPUT_DIR sets where the output files are written
+(defaults to the current directory).
+
     python evidence_collector.py
 """
 
@@ -18,7 +22,12 @@ from datetime import datetime, timezone
 import boto3
 from botocore.exceptions import ClientError
 
-AWS_PROFILE = "grc-lab"
+import os
+
+# Local runs use a named profile. In CI, OIDC supplies credentials via
+# environment, so fall back to boto3's default credential chain.
+AWS_PROFILE = os.environ.get("AWS_PROFILE")
+OUTPUT_DIR = os.environ.get("OUTPUT_DIR", ".")
 
 
 def get_bucket_region(s3_client, bucket_name):
@@ -250,7 +259,7 @@ def save_output(path, write_fn):
 
 
 def main():
-    session = boto3.Session(profile_name=AWS_PROFILE)
+    session = boto3.Session(profile_name=AWS_PROFILE) if AWS_PROFILE else boto3.Session()
     s3_client = session.client("s3")
     kms_client = session.client("kms")
 
@@ -265,9 +274,9 @@ def main():
         results.append({"evidence": evidence, "framework_results": framework_results})
 
     print()
-    save_output("evidence-output.json", lambda path: write_json(results, path))
-    save_output("evidence-output.csv", lambda path: write_csv(results, path))
-    save_output("exceptions.csv", lambda path: write_exceptions_csv(results, path))
+    save_output(os.path.join(OUTPUT_DIR, "evidence-output.json"), lambda path: write_json(results, path))
+    save_output(os.path.join(OUTPUT_DIR, "evidence-output.csv"), lambda path: write_csv(results, path))
+    save_output(os.path.join(OUTPUT_DIR, "exceptions.csv"), lambda path: write_exceptions_csv(results, path))
 
 
 if __name__ == "__main__":

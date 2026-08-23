@@ -1,0 +1,54 @@
+name: Evidence collection
+
+# Runs the S3 encryption evidence collector on a schedule.
+# Credentials come from AWS via OIDC -- no long-lived keys stored in GitHub.
+on:
+  schedule:
+    - cron: "0 16 * * *"
+  workflow_dispatch:
+
+# id-token: write is required for OIDC -- without it the assume-role step fails.
+# contents: read is the least privilege needed for actions/checkout.
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_EVIDENCE_ROLE_ARN }}
+          aws-region: us-east-1
+          # Unique per run so CloudTrail attributes each API call to a specific
+          # workflow run, not to one shared identity.
+          role-session-name: gha-evidence-${{ github.run_id }}
+
+      - name: Build the collector image
+        run: docker build -t grc-evidence-collector .
+
+      - name: Run the collector
+        # The container runs as USER nonroot, which cannot write to the
+        # runner-owned workspace mount without this chmod.
+        run: |
+          mkdir -p out && chmod 777 out
+          docker run --rm \
+            -e AWS_ACCESS_KEY_ID \
+            -e AWS_SECRET_ACCESS_KEY \
+            -e AWS_SESSION_TOKEN \
+            -e AWS_REGION \
+            -e OUTPUT_DIR=/out \
+            -v "${{ github.workspace }}/out:/out" \
+            grc-evidence-collector
+
+      - name: Upload evidence artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-${{ github.run_id }}
+          path: out/
+          retention-days: 30
