@@ -30,6 +30,16 @@ collection instead of scanning every bucket in the account.
 | NIST 800-53 | SC-28 (Protection of Information at Rest), SC-28(1) (Cryptographic Protection) |
 | Mapping Notes & Confidence | High confidence. All three frameworks require encryption of data at rest as a baseline control; NIST SC-28(1) adds an explicit cryptographic-protection enhancement that maps most naturally to customer-managed KMS rather than provider-managed default encryption. Confidence: **High**. |
 
+## Control description
+
+| Who performs it | What they do | Frequency | System | Evidence that proves it |
+|---|---|---|---|---|
+| Automated collector (GitHub Actions workflow assuming a read-only AWS role via OIDC) | Lists every S3 bucket, reads its encryption config and KMS key ownership, and grades it against SOC 2 CC6.1, ISO 27001 A.8.24, and NIST 800-53 SC-28(1) | Daily at 16:00 UTC, plus manual runs on demand | AWS S3, AWS KMS, GitHub Actions | `evidence-output.json`, `evidence-output.csv`, and `exceptions.csv` per run, kept 30 days as artifact `evidence-<run_id>`; CloudTrail entries under session `gha-evidence-<run_id>` |
+| Control owner: Cloud Security Engineer (example) | Reviews each run's FAILs and the exception register, then either fixes the bucket or documents an exception with an `exception_reason` tag | After each run, or weekly (example) | GitHub Actions run output, AWS S3 bucket tags | Exception tags on the bucket and `exceptions.csv`; review sign-off record (example, not produced by the lab) |
+
+Entries marked "example" are assumptions a real organization would set for itself. The
+lab implements only the automated row.
+
 ---
 
 ## Evidence
