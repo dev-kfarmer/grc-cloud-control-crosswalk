@@ -5,6 +5,26 @@ piece of evidence, instead of checking each framework separately. This lab does
 it for AWS S3 encryption at rest, graded against SOC 2 CC6.1, ISO 27001 A.8.24,
 and NIST 800-53 SC-28(1).
 
+## How this maps to controls assurance
+
+- This lab pulls one evidence record per bucket and grades it against SOC 2 CC6.1,
+  ISO 27001 A.8.24, and NIST 800-53 SC-28(1), which demonstrates common control
+  framework thinking: assess once, comply with many.
+- This lab runs the collector every day through a scheduled GitHub Actions workflow
+  that signs in to AWS with OIDC (no stored keys) and keeps each run's output for 30
+  days, which demonstrates continuous controls monitoring instead of a one-time check.
+- This lab writes an exception register (`exceptions.csv`) that lists only waived
+  buckets with their documented reason, and keeps any exception tag without a reason
+  as a FAIL, which demonstrates that findings are either fixed or formally accepted,
+  never quietly dropped. Owner, due date, and closure status are not tracked yet (future).
+- This lab grades every bucket the account inventory (ER-03, `ListBuckets`) returns,
+  with no filtering, and stops with an error instead of skipping a bucket it can't read,
+  which demonstrates evidence completeness: nothing is silently excluded.
+- This lab tests control design with mocked unit tests and five purpose-built test
+  buckets, one for each pass/fail outcome, including a no-encryption state live AWS can
+  no longer produce. It supports operating effectiveness with the daily scheduled runs,
+  where each run leaves a timestamped output and its own CloudTrail session name.
+
 **Visual overview:** https://dev-kfarmer.github.io/grc-cloud-control-crosswalk/visual-overview.html
 — the pipeline, the pass/fail matrix, and the exception register on one page.
 
@@ -77,6 +97,22 @@ code still handles that case, but the only way to test it now is with a mocked
 response, which is what one of the unit tests does. It also leaves NIST's
 customer-managed-key requirement as the one bar that still takes deliberate work
 to meet.
+
+## Evidence reliability
+
+An auditor relying on this output needs to know it is complete and accurate. For
+completeness, the collector grades every bucket the account inventory (ER-03,
+`ListBuckets`) returns. Any unexpected API error, such as access denied, stops the run
+instead of being recorded as a pass or skipped. Waived buckets still show up in the
+report as WAIVED instead of being left out. For accuracy, every value comes straight
+from the AWS APIs through a read-only identity. Each record carries a UTC
+`evidence_timestamp`. In CI, each run uses its own CloudTrail session name
+(`gha-evidence-<run_id>`) and uploads its output as a separate artifact, so a result can
+be traced back to the API calls that produced it. Future: storing the raw API responses
+with each record (the schema in `control-spec.md` shows a `raw_evidence` field, but the
+collector does not populate it yet), saving the ER-03 bucket list as its own timestamped
+file with a count that reconciles to the report, and keeping evidence longer than the
+current 30-day artifact retention.
 
 ## Not done yet
 
